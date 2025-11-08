@@ -1,11 +1,24 @@
 """Enhanced Code Genius Supervisor - Intelligent pipeline with iterative discovery"""
 
+glob py_module = __jac_import__("jaclang.plugin.feature").py_module;
+
 walker orchestrate {
     has repo_url: str = "https://github.com/pallets/flask";
     has analyze_deep: bool = True;
     has max_iterations: int = 3;
 
     can run_pipeline with entry {
+        # Read environment variables if set
+        env_url = py_module("os", "getenv", "JAC_REPO_URL");
+        env_analyze = py_module("os", "getenv", "JAC_ANALYZE_DEEP");
+        
+        if env_url {
+            self.repo_url = env_url;
+        }
+        if env_analyze {
+            self.analyze_deep = env_analyze == "true";
+        }
+        
         print("🚀 Starting Code Genius Supervisor");
         print("=" * 60);
         
@@ -120,12 +133,14 @@ walker orchestrate {
         print("\n✅ Pipeline complete!");
         print("=" * 60);
         
+        # Output JSON for API consumption
         std.out({
-            "status": "complete",
-            "repo_url": normalized_url,
-            "markdown_path": md_path,
+            "status": "ok",
             "repo_path": info["repo_path"],
-            "priority_files_found": len(priority_files),
+            "output_markdown": md_path,
+            "readme_summary": info["readme_summary"],
+            "symbol_count": stats["total_symbols"],
+            "file_tree_root": info["file_tree"]["path"] if "path" in info["file_tree"] else ".",
             "statistics": stats,
             "dependencies": {
                 "total_imports": final_dependencies["total_imports"],
@@ -134,13 +149,14 @@ walker orchestrate {
                 "unanalyzed_internal": final_dependencies["unanalyzed_internal"],
                 "discovery_complete": final_dependencies["discovery_complete"]
             },
-            "analysis_plan": {
-                "deep_analysis": self.analyze_deep,
-                "priority_files_count": len(priority_files),
-                "discovery_iterations": iteration,
-                "modules_discovered": total_discovered
-            }
+            "discovery_iterations": iteration,
+            "priority_files_count": len(priority_files)
         });
     }
+}
+
+# Entry point to spawn the walker
+with entry {
+    orchestrate() spawn root;
 }
 

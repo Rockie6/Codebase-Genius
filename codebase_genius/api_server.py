@@ -3,20 +3,28 @@ Run: uvicorn codebase_genius.api_server:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
 import os
+import json
 import traceback
 import shutil
 import tempfile
+import subprocess
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, RedirectResponse
 from pathlib import Path
 from pydantic import BaseModel, HttpUrl
 from typing import Dict, Any, Union, Optional
-from .python_helpers.repo_tools import repo_map_workflow
-from .python_helpers.analyzer import analyze_repo
+from .python_helpers.repo_tools import repo_map_workflow, validate_repo_url, find_important_files
+from .python_helpers.analyzer import analyze_repo, discover_dependencies, aggregate_ccg_statistics
 from .python_helpers.docgen import generate_markdown
 
 app = FastAPI(title="Codebase Genius", version="0.1.0")
+
+
+@app.get("/")
+def root():
+    """Redirect root URL to GUI."""
+    return RedirectResponse(url="/gui/")
 
  
 class GenerateRequest(BaseModel):
@@ -43,41 +51,64 @@ class ErrorResponse(BaseModel):
  
 @app.post("/generate", response_model=Union[GenerateResponse, ErrorResponse])
 def generate(req: GenerateRequest) -> Union[GenerateResponse, ErrorResponse]:
-    """Generate repository documentation.
+    """Generate repository documentation using Python helpers with iterative discovery.
 
     Returns GenerateResponse on success or ErrorResponse with structured
     error_code/message when mapping fails or unexpected errors occur.
     """
-    info = repo_map_workflow(str(req.repo_url))
-    if info.get("error"):
-        raw_err = info["error"]  # e.g., 'repo_map_failed: Git clone failed...'
-        # Parse code prefix pattern 'code: message'
-        if ":" in raw_err:
-            code, msg = raw_err.split(":", 1)
-            code = code.strip()
-            msg = msg.strip()
-        else:
-            code, msg = "unknown_error", raw_err
-        return ErrorResponse(
-            error_code=code,
-            message=msg,
-            details={"repo_url": str(req.repo_url)},
-        )
     try:
+        # Step 1: Validate URL
+        validation = validate_repo_url(str(req.repo_url))
+        if not validation["valid"]:
+            return ErrorResponse(
+                error_code="invalid_url",
+                message=validation["error"]
+            )
+        
+        # Step 2: Map repository
+        info = repo_map_workflow(validation["normalized_url"])
+        if info.get("error"):
+            raw_err = info["error"]
+            if ":" in raw_err:
+                code, msg = raw_err.split(":", 1)
+                code = code.strip()
+                msg = msg.strip()
+            else:
+                code, msg = "unknown_error", raw_err
+            return ErrorResponse(
+                error_code=code,
+                message=msg,
+                details={"repo_url": str(req.repo_url)},
+            )
+        
+        # Step 3: Find priority files
+        priority_files = find_important_files(info["file_tree"])
+        
+        # Step 4: Analyze with iterative discovery
         ccg: Dict[str, Any]
         if req.analyze:
             ccg = analyze_repo(info["repo_path"])
+            
+            # Iterative dependency discovery
+            max_iterations = 3
+            for iteration in range(1, max_iterations + 1):
+                dependencies = discover_dependencies(ccg, info["repo_path"])
+                if dependencies["discovery_complete"]:
+                    break
         else:
             ccg = {"nodes": [], "edges": []}
+        
+        # Step 5: Generate documentation  
         repo_name = os.path.basename(info["repo_path"]) or "repo"
         out_dir = os.path.join("outputs", repo_name)
         md_path = generate_markdown(
-            str(req.repo_url),
+            validation["normalized_url"],
             info["file_tree"],
             info["readme_summary"],
             ccg,
             out_dir,
         )
+        
         return GenerateResponse(
             status="ok",
             repo_path=info["repo_path"],
@@ -86,7 +117,8 @@ def generate(req: GenerateRequest) -> Union[GenerateResponse, ErrorResponse]:
             symbol_count=len(ccg.get("nodes", [])),
             file_tree_root=(info["file_tree"].get("path", ".") if info.get("file_tree") else "."),
         )
-    except Exception as e:  # pragma: no cover
+        
+    except Exception as e:
         traceback.print_exc()
         return ErrorResponse(
             error_code="unhandled_exception",

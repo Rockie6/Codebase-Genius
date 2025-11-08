@@ -2,7 +2,9 @@
 """Test the complete documentation generation pipeline."""
 import os
 os.environ["USE_LLM"] = "true"
-os.environ["GEMINI_API_KEY"] = "AIzaSyDYGtyz_5AfplZi0Og185BOX_8JO767i2w"
+# Set GEMINI_API_KEY in your environment or .env file
+if not os.getenv("GEMINI_API_KEY"):
+    print("Warning: GEMINI_API_KEY not set. LLM features will be disabled.")
 
 from codebase_genius.python_helpers.repo_tools import repo_map_workflow
 from codebase_genius.python_helpers.analyzer import analyze_repo
