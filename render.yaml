@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: codebase-genius
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: .
+    buildCommand: pip install --upgrade pip && pip install -r codebase_genius/requirements.txt
+    startCommand: python start_server.py
+    envVars:
+      - key: USE_LLM
+        value: "true"
+      - key: GEMINI_API_KEY
+        sync: false
