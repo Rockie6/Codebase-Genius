@@ -6,7 +6,7 @@ import os
 from typing import Optional
 
 try:
-    import google.generativeai as genai  # type: ignore
+    import google.genai as genai  # type: ignore
     HAS_GEMINI = True
 except Exception:  # pragma: no cover
     HAS_GEMINI = False

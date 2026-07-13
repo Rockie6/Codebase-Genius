@@ -40,6 +40,13 @@ htmlcov/
 .DS_Store
 
 # Environment variables
+.env
+.env.local
+.env.*.local
+
+# Virtual Environment
+venv/
+.venv/
 
 # Logs
 *.log
