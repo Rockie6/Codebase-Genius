@@ -21,8 +21,6 @@ wheels/
 *.egg
 
 # Virtual Environment
-.venv/
-venv/
 ENV/
 env/
 
@@ -42,7 +40,6 @@ htmlcov/
 .DS_Store
 
 # Environment variables
-.env
 
 # Logs
 *.log
