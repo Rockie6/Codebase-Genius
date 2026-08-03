@@ -5,13 +5,12 @@ PY := $(VENV_DIR)/bin/python
 PIP := $(VENV_DIR)/bin/pip
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv deps install run test test-diagram generate docker-build docker-run docker-stop docker-clean clean clean-venv
+.PHONY: help venv deps install run test-diagram generate docker-build docker-run docker-stop docker-clean clean clean-venv
 
 help:
 	@echo "Targets:"
 	@echo "  make install        # create venv and install deps"
 	@echo "  make run            # run FastAPI server"
-	@echo "  make test           # run smoke test"
 	@echo "  make docker-build   # build Docker image"
 	@echo "  make docker-run     # run Docker container"
 	@echo "  make clean-venv     # remove .venv"
@@ -28,9 +27,6 @@ install: deps
 
 run:
 	$(UVICORN) codebase_genius.api_server:app --host 0.0.0.0 --port 8000
-
-test:
-	$(PY) -m pytest tests/ -v
 
 test-diagram:
 	$(PY) -c "from codebase_genius.python_helpers.docgen import generate_markdown; print('Diagram generation available')"

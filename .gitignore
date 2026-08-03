@@ -26,8 +26,7 @@ env/
 venv/
 .venv/
 
-# Testing
-.pytest_cache/
+# Testing artifacts
 .coverage
 htmlcov/
 *.cover

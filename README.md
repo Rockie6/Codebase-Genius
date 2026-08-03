@@ -9,7 +9,7 @@ Drop in a repo URL and get back a friendly, readable set of documentation — ge
 - 📊 Builds a Code Context Graph (CCG) of classes, functions, and how they relate
 - 🎨 Clean web UI with preview, copy, and download
 - ✅ Validates URLs for GitHub, GitLab, and Bitbucket
-- 🧪 Tested (26 tests, all passing)
+
 
 ## 🚀 Quick start
 
@@ -62,18 +62,6 @@ The pipeline is orchestrated in `orchestrator.py`, which leans on four helpers:
 - `llm.py` — optional Gemini summaries
 
 On top of that: `api_server.py` exposes a FastAPI REST layer, and `gui/index.html` is the web interface.
-
-## 🧪 Testing
-
-```bash
-# Run the whole suite
-python -m pytest tests/ -v
-
-# With coverage
-python -m pytest tests/ --cov=codebase_genius/python_helpers --cov-report=term
-```
-
-More detail in [TESTING.md](TESTING.md).
 
 ## 🔧 Configuration
 
