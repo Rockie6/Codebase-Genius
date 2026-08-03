@@ -1,30 +1,30 @@
-# Testing Documentation
+# Testing
 
-## Test Suite Overview
+## Overview
 
-This project includes a comprehensive test suite with **20 tests** covering core functionality.
+Codebase Genius ships with a test suite of **26 tests** covering the core machinery: URL handling, file discovery, the code analyzer, and dependency discovery.
 
-### Running Tests
+### Running the tests
 
 ```bash
-# Run all tests
+# Everything
 python -m pytest tests/ -v
 
-# Run with coverage
+# With coverage
 python -m pytest tests/ --cov=codebase_genius/python_helpers --cov-report=term
 
-# Run specific test file
+# Just one file
 python -m pytest tests/test_analyzer.py -v
 python -m pytest tests/test_repo_tools.py -v
 ```
 
-### Test Coverage
+### Test coverage
 
-Current test coverage (as of latest run):
+Latest run:
 - **Overall**: 19% of Python helpers
-- **repo_tools.py**: 42% coverage
-- **analyzer.py**: 28% coverage
-- **All 20 tests passing** ✅
+- **repo_tools.py**: 42%
+- **analyzer.py**: 28%
+- **All 26 tests passing** ✅
 
 ## Test Organization
 
@@ -45,12 +45,12 @@ Current test coverage (as of latest run):
 - `test_find_priority_files_only`: Verifies only Python entry points are prioritized
 - `test_empty_tree`: Handles empty file trees
 
-### `tests/test_analyzer.py` (9 tests)
+### `tests/test_analyzer.py` (15 tests)
 
 **CCG Statistics Tests** (3 tests):
-- `test_basic_statistics`: Validates counts for classes, functions, modules, edges
+- `test_basic_statistics`: Counts classes, functions, modules, and edges
 - `test_empty_ccg`: Handles empty code context graphs
-- `test_missing_kind_field`: Graceful handling of malformed data
+- `test_missing_kind_field`: Tolerates malformed data
 
 **Dependency Discovery Tests** (5 tests):
 - `test_discover_external_dependencies`: Identifies third-party imports
@@ -58,6 +58,16 @@ Current test coverage (as of latest run):
 - `test_discovery_complete_flag`: Detects when discovery is finished
 - `test_empty_ccg_discovery`: Handles empty graphs
 - `test_module_name_extraction`: Parses module names from paths
+
+**Import Edge Tests** (3 tests):
+- `test_naive_parse_emits_import_edges`: Imports surface as graph edges
+- `test_build_ccg_creates_import_edges`: Real files produce import edges
+- `test_statistics_count_lowercase_edges`: Stats match the edge types we emit
+
+**Iterative Discovery Tests** (3 tests):
+- `test_absolute_import_discovery`: Finds and analyzes unanalyzed internal modules
+- `test_relative_import_resolution`: Relative imports resolve after analysis
+- `test_external_deps_not_treated_as_internal`: Third-party imports stay external
 
 **Integration Tests** (1 test):
 - `test_full_analysis_workflow`: End-to-end workflow validation
@@ -85,32 +95,31 @@ Current test coverage (as of latest run):
 - Standard library filtering
 - Completion detection
 - Multi-iteration support
+- Real import-edge generation (Tree-sitter and naive parser)
 
-## Development Workflow
+## Workflow
 
-1. **Before commits**: Run full test suite
+1. **Before committing**: run the whole suite.
    ```bash
    python -m pytest tests/ -v
    ```
 
-2. **After changes**: Verify coverage didn't drop
+2. **After changes**: make sure coverage hasn't dropped.
    ```bash
    python -m pytest tests/ --cov=codebase_genius/python_helpers --cov-report=term
    ```
 
-3. **Add new tests**: When adding features, create corresponding tests in `tests/`
+3. **Adding tests**: when you add a feature, add tests alongside it in `tests/`.
 
-## Known Limitations
+## Known limitations
 
-- Coverage focuses on new features (validation, discovery, statistics)
-- Full codebase coverage not yet implemented
-- Integration tests limited to core workflow
-- No tests for `docgen.py` (LLM generation) - requires mocking
+- Coverage is focused on the newer parts (validation, discovery, statistics)
+- `docgen.py` isn't covered yet — it needs LLM mocking
+- Integration tests only cover the core workflow
 
-## Future Testing Goals
+## Where to go next
 
-- [ ] Increase coverage to 50%+
-- [ ] Add integration tests for full pipeline
-- [ ] Mock LLM calls for docgen testing
+- [ ] Push coverage to 50%+
+- [ ] Mock LLM calls and test `docgen.py`
 - [ ] Add performance benchmarks
-- [ ] Test error handling paths
+- [ ] Exercise the error-handling paths more

@@ -1,13 +1,16 @@
-"""FastAPI wrapper for Codebase Genius pipeline.
-Run: uvicorn codebase_genius.api_server:app --host 0.0.0.0 --port 8000
+"""FastAPI wrapper for the Codebase Genius pipeline.
+
+Run it with:
+    uvicorn codebase_genius.api_server:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
 import os
-import json
 import traceback
 import shutil
-import tempfile
-import subprocess
+
+from . import load_env
+load_env()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, RedirectResponse
@@ -15,7 +18,7 @@ from pathlib import Path
 from pydantic import BaseModel, HttpUrl
 from typing import Dict, Any, Union, Optional
 from .python_helpers.repo_tools import repo_map_workflow, validate_repo_url, find_important_files
-from .python_helpers.analyzer import analyze_repo, discover_dependencies, aggregate_ccg_statistics
+from .python_helpers.analyzer import analyze_files, discover_dependencies, list_python_files
 from .python_helpers.docgen import generate_markdown
 
 app = FastAPI(title="Codebase Genius", version="0.1.0")
@@ -51,10 +54,10 @@ class ErrorResponse(BaseModel):
  
 @app.post("/generate", response_model=Union[GenerateResponse, ErrorResponse])
 def generate(req: GenerateRequest) -> Union[GenerateResponse, ErrorResponse]:
-    """Generate repository documentation using Python helpers with iterative discovery.
+    """Generate documentation for a repository.
 
-    Returns GenerateResponse on success or ErrorResponse with structured
-    error_code/message when mapping fails or unexpected errors occur.
+    Returns a GenerateResponse on success, or an ErrorResponse with a friendly
+    error_code/message if something goes wrong along the way.
     """
     try:
         # Step 1: Validate URL
@@ -87,14 +90,30 @@ def generate(req: GenerateRequest) -> Union[GenerateResponse, ErrorResponse]:
         # Step 4: Analyze with iterative discovery
         ccg: Dict[str, Any]
         if req.analyze:
-            ccg = analyze_repo(info["repo_path"])
-            
-            # Iterative dependency discovery
+            repo_path = info["repo_path"]
+            priority_paths = [os.path.join(repo_path, f) for f in priority_files]
+            if priority_paths:
+                ccg = analyze_files(priority_paths)
+                analyzed = set(priority_paths)
+            else:
+                all_files = list_python_files(repo_path)
+                ccg = analyze_files(all_files)
+                analyzed = set(all_files)
+
+            # Iterative dependency discovery: analyze newly found internal
+            # modules until no more remain or the iteration budget is hit.
             max_iterations = 3
-            for iteration in range(1, max_iterations + 1):
-                dependencies = discover_dependencies(ccg, info["repo_path"])
-                if dependencies["discovery_complete"]:
+            for _ in range(max_iterations):
+                dependencies = discover_dependencies(ccg, repo_path)
+                new_files = [
+                    f
+                    for f in dependencies["potential_files_to_analyze"]
+                    if f not in analyzed
+                ]
+                if not new_files:
                     break
+                ccg = analyze_files(new_files, base_ccg=ccg)
+                analyzed.update(new_files)
         else:
             ccg = {"nodes": [], "edges": []}
         
@@ -134,13 +153,10 @@ def health():
 
 @app.get("/download/{repo_name}")
 def download_documentation(repo_name: str):
-    """Download generated documentation as markdown file.
+    """Let the user download the generated docs as a Markdown file.
     
     Args:
-        repo_name: Name of the repository (used to locate output directory)
-    
-    Returns:
-        FileResponse with the generated docs.md file
+        repo_name: Name of the repository (used to find the output directory)
     """
     # Sanitize repo name to prevent directory traversal
     safe_repo_name = repo_name.replace("..", "").replace("/", "").replace("\\", "")
@@ -150,8 +166,8 @@ def download_documentation(repo_name: str):
     if not docs_path.exists():
         raise HTTPException(
             status_code=404,
-            detail=f"Documentation not found for repository '{safe_repo_name}'. "
-                   f"Please generate documentation first."
+            detail=f"We don't have docs for '{safe_repo_name}' yet. "
+                   f"Generate them first and try again."
         )
     
     return FileResponse(
@@ -166,13 +182,10 @@ def download_documentation(repo_name: str):
 
 @app.get("/download-content/{repo_name}")
 def download_documentation_content(repo_name: str):
-    """Get documentation content as plain text (for frontend preview/copy).
-    
+    """Return the documentation as plain text (for the frontend preview/copy).
+
     Args:
         repo_name: Name of the repository
-    
-    Returns:
-        Plain text content of the documentation
     """
     safe_repo_name = repo_name.replace("..", "").replace("/", "").replace("\\", "")
     docs_path = Path("outputs") / safe_repo_name / "docs.md"

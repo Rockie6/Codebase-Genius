@@ -2,7 +2,10 @@
 import pytest
 from codebase_genius.python_helpers.analyzer import (
     aggregate_ccg_statistics,
-    discover_dependencies
+    analyze_files,
+    build_ccg,
+    discover_dependencies,
+    naive_parse,
 )
 
 
@@ -18,9 +21,9 @@ class TestCCGStatistics:
                 {"kind": "module", "name": "my_module"}
             ],
             "edges": [
-                {"type": "INHERITS_FROM", "source": "A", "target": "B"},
-                {"type": "CALLS", "source": "C", "target": "D"},
-                {"type": "IMPORTS", "source": "E", "target": "F"}
+                {"type": "inherits", "source": "A", "target": "B"},
+                {"type": "calls", "source": "C", "target": "D"},
+                {"type": "imports", "source": "E", "target": "F"}
             ]
         }
         
@@ -71,9 +74,9 @@ class TestDependencyDiscovery:
                 {"name": "myapp.main", "kind": "module"}
             ],
             "edges": [
-                {"type": "IMPORTS", "target": "requests"},
-                {"type": "IMPORTS", "target": "flask"},
-                {"type": "IMPORTS", "target": "os"}
+                {"type": "imports", "target": "requests"},
+                {"type": "imports", "target": "flask"},
+                {"type": "imports", "target": "os"}
             ]
         }
         
@@ -88,10 +91,10 @@ class TestDependencyDiscovery:
         ccg = {
             "nodes": [],
             "edges": [
-                {"type": "IMPORTS", "target": "os"},
-                {"type": "IMPORTS", "target": "sys"},
-                {"type": "IMPORTS", "target": "json"},
-                {"type": "IMPORTS", "target": "pathlib"}
+                {"type": "imports", "target": "os"},
+                {"type": "imports", "target": "sys"},
+                {"type": "imports", "target": "json"},
+                {"type": "imports", "target": "pathlib"}
             ]
         }
         
@@ -106,7 +109,7 @@ class TestDependencyDiscovery:
         # All modules analyzed
         ccg1 = {
             "nodes": [{"name": "myapp", "kind": "module"}],
-            "edges": [{"type": "IMPORTS", "target": "myapp"}]
+            "edges": [{"type": "imports", "target": "myapp"}]
         }
         result1 = discover_dependencies(ccg1, "/tmp/test")
         assert result1["discovery_complete"] is True
@@ -114,7 +117,7 @@ class TestDependencyDiscovery:
         # Unanalyzed internal module (must start with repo name or have relative import)
         ccg2 = {
             "nodes": [{"name": "test.main", "kind": "module"}],  # repo is "test"
-            "edges": [{"type": "IMPORTS", "target": "test.utils"}]  # Internal, unanalyzed
+            "edges": [{"type": "imports", "target": "test.utils"}]  # Internal, unanalyzed
         }
         result2 = discover_dependencies(ccg2, "/tmp/test")
         # If the module name doesn't match repo structure, it might not detect it as internal
@@ -135,8 +138,8 @@ class TestDependencyDiscovery:
         ccg = {
             "nodes": [],
             "edges": [
-                {"type": "IMPORTS", "target": "os.path:join"},
-                {"type": "IMPORTS", "target": "json"}
+                {"type": "imports", "target": "os.path:join"},
+                {"type": "imports", "target": "json"}
             ]
         }
         
@@ -161,10 +164,10 @@ class TestIntegration:
                 {"kind": "module", "name": "myapp.models"}
             ],
             "edges": [
-                {"type": "INHERITS_FROM", "source": "UserModel", "target": "BaseModel"},
-                {"type": "CALLS", "source": "process_data", "target": "validate"},
-                {"type": "IMPORTS", "target": "django"},
-                {"type": "IMPORTS", "target": "os"}
+                {"type": "inherits", "source": "UserModel", "target": "BaseModel"},
+                {"type": "calls", "source": "process_data", "target": "validate"},
+                {"type": "imports", "target": "django"},
+                {"type": "imports", "target": "os"}
             ]
         }
         
@@ -179,3 +182,102 @@ class TestIntegration:
         
         # Verify consistency
         assert stats["total_edges"] == len(ccg["edges"])
+
+
+class TestImportEdges:
+    """Test real import-edge generation from source parsing"""
+
+    def test_naive_parse_emits_import_edges(self):
+        """Test naive parser captures full dotted module paths as import edges"""
+        content = (
+            "import os\n"
+            "import requests\n"
+            "from flask import Flask\n"
+            "from .utils import helper\n"
+        )
+        symbols, edges = naive_parse(content)
+        import_targets = {tgt for src, tgt, etype in edges if etype == "imports"}
+        assert "os" in import_targets
+        assert "requests" in import_targets
+        assert "flask" in import_targets
+        assert ".utils" in import_targets
+
+    def test_build_ccg_creates_import_edges(self, tmp_path):
+        """Test CCG construction records import edges from real files"""
+        (tmp_path / "app.py").write_text("import requests\nfrom .models import User\n")
+        (tmp_path / "models.py").write_text("class User: pass\n")
+        ccg = build_ccg(str(tmp_path))
+        import_edges = [e for e in ccg["edges"] if e.get("type") == "imports"]
+        targets = {e["target"] for e in import_edges}
+        assert "requests" in targets
+        assert ".models" in targets
+        assert len(targets) == 2
+
+    def test_statistics_count_lowercase_edges(self):
+        """Test statistics match the lowercase edge types build_ccg produces"""
+        ccg = {
+            "nodes": [
+                {"kind": "class", "name": "A"},
+                {"kind": "function", "name": "f"},
+            ],
+            "edges": [
+                {"type": "inherits", "source": "A", "target": "B"},
+                {"type": "calls", "source": "f", "target": "g"},
+                {"type": "imports", "source": "app.py", "target": "os"},
+            ],
+        }
+        stats = aggregate_ccg_statistics(ccg)
+        assert stats["inheritance_edges"] == 1
+        assert stats["call_edges"] == 1
+        assert stats["import_edges"] == 1
+
+
+class TestIterativeDiscovery:
+    """End-to-end iterative discovery across real files"""
+
+    def test_absolute_import_discovery(self, tmp_path):
+        """Test discovering and analyzing an unanalyzed internal module"""
+        (tmp_path / "main.py").write_text("from mypkg.core import run\n")
+        (tmp_path / "mypkg").mkdir()
+        (tmp_path / "mypkg" / "__init__.py").write_text("")
+        (tmp_path / "mypkg" / "core.py").write_text("def run():\n    pass\n")
+
+        ccg = analyze_files([str(tmp_path / "main.py")])
+        deps = discover_dependencies(ccg, str(tmp_path))
+
+        core_path = str(tmp_path / "mypkg" / "core.py")
+        assert "mypkg.core" in deps["unanalyzed_internal"]
+        assert core_path in deps["potential_files_to_analyze"]
+        assert deps["discovery_complete"] is False
+
+        ccg = analyze_files([core_path], base_ccg=ccg)
+        deps = discover_dependencies(ccg, str(tmp_path))
+        assert "mypkg.core" not in deps["unanalyzed_internal"]
+        assert deps["discovery_complete"] is True
+
+    def test_relative_import_resolution(self, tmp_path):
+        """Test relative imports resolve once the target file is analyzed"""
+        (tmp_path / "main.py").write_text("from .utils import helper\n")
+        (tmp_path / "utils.py").write_text("def helper():\n    pass\n")
+
+        ccg = analyze_files([str(tmp_path / "main.py")])
+        deps = discover_dependencies(ccg, str(tmp_path))
+        assert ".utils" in deps["unanalyzed_internal"]
+        assert str(tmp_path / "utils.py") in deps["potential_files_to_analyze"]
+
+        ccg = analyze_files([str(tmp_path / "utils.py")], base_ccg=ccg)
+        deps = discover_dependencies(ccg, str(tmp_path))
+        assert deps["discovery_complete"] is True
+
+    def test_external_deps_not_treated_as_internal(self, tmp_path):
+        """Test third-party and stdlib imports are not flagged as internal"""
+        (tmp_path / "app.py").write_text(
+            "import os\nimport requests\nfrom flask import Flask\n"
+        )
+        ccg = analyze_files([str(tmp_path / "app.py")])
+        deps = discover_dependencies(ccg, str(tmp_path))
+        assert "os" in deps["stdlib_imports"]
+        assert "requests" in deps["external_dependencies"]
+        assert "flask" in deps["external_dependencies"]
+        assert deps["unanalyzed_internal"] == []
+        assert deps["discovery_complete"] is True

@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Start the Codebase Genius API server with proper environment setup."""
+"""Start the Codebase Genius API server (loads your .env for you)."""
 import os
 import sys
 
-# Load environment variables from .env file if it exists
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from codebase_genius import load_env
+load_env()
 
 # Set default environment variables if not already set
 if not os.getenv('USE_LLM'):
@@ -16,8 +12,8 @@ if not os.getenv('USE_LLM'):
 
 # Check if API key is set
 if not os.getenv('GEMINI_API_KEY'):
-    print("⚠️  Warning: GEMINI_API_KEY not set. LLM features will be disabled.")
-    print("   Set it in .env file or as environment variable")
+    print("⚠️  No GEMINI_API_KEY found — that's fine, the fancy LLM extras will just be skipped.")
+    print("   To enable them, drop a key in your .env file (see .env.example).")
 
 import uvicorn
 from codebase_genius.api_server import app
@@ -30,10 +26,10 @@ if __name__ == "__main__":
     print("🧠 CODEBASE GENIUS API SERVER")
     print("=" * 70)
     print(f"\n📡 Server starting on http://0.0.0.0:{port}")
-    print(f"🎨 GUI available at http://0.0.0.0:{port}/gui")
-    print(f"📊 API docs at http://0.0.0.0:{port}/docs")
-    print(f"❤️  Health check at http://0.0.0.0:{port}/health")
-    print("\nPress CTRL+C to stop the server\n")
+    print(f"🎨 Web UI:    http://0.0.0.0:{port}/gui")
+    print(f"📊 API docs:  http://0.0.0.0:{port}/docs")
+    print(f"❤️  Health:    http://0.0.0.0:{port}/health")
+    print("\nPress CTRL+C any time to stop the server\n")
     print("=" * 70)
     
     try:

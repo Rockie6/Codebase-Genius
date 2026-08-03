@@ -1,4 +1,7 @@
-"""DocGenie: synthesize Markdown docs and simple diagrams.
+"""DocGenie: turns the Code Context Graph into friendly Markdown docs.
+
+Everything in here is about presentation: taking the raw analysis and
+writing it up the way a person would want to read it.
 """
 from __future__ import annotations
 import os
@@ -20,7 +23,7 @@ def render_ccg_diagram(
     name: str = "ccg",
     max_nodes: int = 50,
 ) -> str:
-    """Render full CCG diagram with all nodes and edges."""
+    """Render the full Code Context Graph as a diagram (all nodes and edges)."""
     if Digraph is None:
         return ""
     
@@ -79,7 +82,7 @@ def render_class_hierarchy_diagram(
     out_dir: str,
     name: str = "class_hierarchy",
 ) -> str:
-    """Render class inheritance hierarchy diagram."""
+    """Render the class inheritance hierarchy as a diagram."""
     if Digraph is None:
         return ""
     
@@ -128,7 +131,7 @@ def render_call_graph_diagram(
     name: str = "call_graph",
     max_nodes: int = 30,
 ) -> str:
-    """Render function call graph diagram."""
+    """Render the function call graph as a diagram."""
     if Digraph is None:
         return ""
     
@@ -237,7 +240,8 @@ def _analyze_ccg_stats(ccg: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _format_installation_section(repo_url: str, file_tree: Dict[str, Any]) -> str:
-    """Generate Installation section by detecting package files."""
+    """Write an Installation section, picking instructions from the package
+    files we can see in the repo (requirements.txt, setup.py, pyproject.toml)."""
     lines = []
     lines.append("## Installation\n")
     
@@ -270,20 +274,20 @@ def _format_installation_section(repo_url: str, file_tree: Dict[str, Any]) -> st
     
     # Install instructions
     if has_requirements:
-        lines.append("Install dependencies:")
+        lines.append("Then install the dependencies:")
         lines.append("```bash")
         lines.append("pip install -r requirements.txt")
         lines.append("```\n")
     elif has_setup_py:
-        lines.append("Install the package:")
+        lines.append("Then install the package in editable mode:")
         lines.append("```bash")
         lines.append("pip install -e .")
         lines.append("```\n")
     elif has_pyproject:
-        lines.append("Install using poetry or pip:")
+        lines.append("Then install the package (Poetry or pip both work):")
         lines.append("```bash")
         lines.append("poetry install")
-        lines.append("# or")
+        lines.append("# or simply")
         lines.append("pip install .")
         lines.append("```\n")
     
@@ -291,7 +295,7 @@ def _format_installation_section(repo_url: str, file_tree: Dict[str, Any]) -> st
 
 
 def _format_usage_section(ccg_stats: Dict[str, Any]) -> str:
-    """Generate Usage section with entry points."""
+    """Write a Usage section, pointing to any entry points we found."""
     lines = []
     lines.append("## Usage\n")
     
@@ -303,19 +307,19 @@ def _format_usage_section(ccg_stats: Dict[str, Any]) -> str:
             entry_points.append(mod)
     
     if entry_points:
-        lines.append("Entry points detected:\n")
+        lines.append("Here are the entry points we spotted:\n")
         for ep in entry_points[:3]:
             file_path = Path(ep.get("file", ""))
             lines.append(f"- `{file_path.name}`: {ep.get('name', 'N/A')}")
         lines.append("")
     else:
-        lines.append("Please refer to the repository documentation for usage instructions.\n")
+        lines.append("No obvious entry point stood out — check the repository's README for usage instructions.\n")
     
     return "\n".join(lines)
 
 
 def _format_api_reference_section(ccg_stats: Dict[str, Any]) -> str:
-    """Generate API Reference section with classes and key functions."""
+    """Write an API Reference section listing classes and notable functions."""
     lines = []
     lines.append("## API Reference\n")
     
@@ -344,7 +348,8 @@ def _format_api_reference_section(ccg_stats: Dict[str, Any]) -> str:
     high_complexity = ccg_stats.get("high_complexity", [])
     if high_complexity:
         lines.append("### High-Complexity Functions\n")
-        lines.append("Functions with complexity > 10 (may need refactoring):\n")
+        lines.append("These functions carry a lot of logic (estimated complexity above 10) "
+                     "and may be worth splitting up:\n")
         for func in high_complexity[:10]:
             name = func.get("name", "")
             file_path = Path(func.get("file", ""))
@@ -355,18 +360,18 @@ def _format_api_reference_section(ccg_stats: Dict[str, Any]) -> str:
     hotspots = ccg_stats.get("hotspots", [])
     if hotspots:
         lines.append("### Most-Called Functions (Hotspots)\n")
-        lines.append("Functions frequently called by others:\n")
+        lines.append("These are the functions the rest of the code leans on the most:\n")
         for target, count in hotspots[:10]:
             # Extract function name from key (file:name)
             func_name = target.split(":")[-1] if ":" in target else target
-            lines.append(f"- `{func_name}` ({count} calls)")
+            lines.append(f"- `{func_name}` (called {count} times)")
         lines.append("")
     
     return "\n".join(lines)
 
 
 def _format_architecture_section(ccg_stats: Dict[str, Any]) -> str:
-    """Generate Architecture section with inheritance hierarchy."""
+    """Write an Architecture section summarizing the code's shape."""
     lines = []
     lines.append("## Architecture\n")
     
@@ -385,7 +390,7 @@ def _format_architecture_section(ccg_stats: Dict[str, Any]) -> str:
     base_classes = ccg_stats.get("base_classes", [])
     if base_classes:
         lines.append("### Base Classes\n")
-        lines.append("Classes that serve as base classes for others:\n")
+        lines.append("Classes that other classes build on:\n")
         for bc in base_classes[:10]:
             class_name = bc.split(":")[-1] if ":" in bc else bc
             lines.append(f"- `{class_name}`")
@@ -415,8 +420,8 @@ def generate_markdown(
     with open(md_path, "w", encoding="utf-8") as f:
         # Title
         repo_name = repo_url.split("/")[-1].replace(".git", "")
-        f.write(f"# {repo_name} - Documentation\n\n")
-        f.write(f"*Auto-generated documentation for [{repo_url}]({repo_url})*\n\n")
+        f.write(f"# {repo_name} – Documentation\n\n")
+        f.write(f"*Auto-generated by Codebase Genius for [{repo_url}]({repo_url})*\n\n")
         f.write("---\n\n")
         
         # Overview
@@ -460,7 +465,7 @@ def generate_markdown(
         
         # Footer
         f.write("---\n\n")
-        f.write("*Generated by Codebase Genius - AI-powered documentation system*\n")
+        f.write("*Generated with Codebase Genius — an AI-powered documentation generator.*\n")
     
     return md_path
 

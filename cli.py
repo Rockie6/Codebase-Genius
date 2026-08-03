@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""CLI interface for Codebase Genius using the Python orchestrator."""
+"""Command-line interface for Codebase Genius."""
 import sys
 import os
 from pathlib import Path
+
+from codebase_genius import load_env
+load_env()
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -21,14 +24,14 @@ def main():
 Examples:
   python cli.py https://github.com/pallets/flask
   python cli.py https://github.com/requests/requests --no-analysis
-  JAC_REPO_URL="https://github.com/django/django" python cli.py
+  CODEBASE_GENIUS_REPO_URL="https://github.com/django/django" python cli.py
         """,
     )
 
     parser.add_argument(
         "repo_url",
         nargs="?",
-        help="Repository URL to analyze (can also use JAC_REPO_URL env var)",
+        help="Repository URL to analyze (can also use CODEBASE_GENIUS_REPO_URL env var)",
     )
     parser.add_argument(
         "--no-analysis",
@@ -45,10 +48,10 @@ Examples:
     args = parser.parse_args()
 
     # Determine repo URL
-    repo_url = args.repo_url or os.getenv("JAC_REPO_URL")
+    repo_url = args.repo_url or os.getenv("CODEBASE_GENIUS_REPO_URL")
     if not repo_url:
         parser.print_help()
-        print("\n❌ Error: Repository URL is required (via argument or JAC_REPO_URL env var)")
+        print("\n❌ Oops — we need a repository URL. Pass one as an argument, or set CODEBASE_GENIUS_REPO_URL.")
         sys.exit(1)
 
     # Create and run orchestrator
@@ -62,12 +65,12 @@ Examples:
 
     # Exit with appropriate code
     if result["status"] != "ok":
-        print(f"\n❌ Pipeline failed: {result.get('message', 'Unknown error')}")
+        print(f"\n❌ Something went wrong: {result.get('message', 'Unknown error')}")
         sys.exit(1)
 
-    print("\n✅ Success! Results:")
-    print(f"  Repo: {result['repo_path']}")
-    print(f"  Docs: {result['output_markdown']}")
+    print("\n✅ Done! Here's what we got:")
+    print(f"  Repo:   {result['repo_path']}")
+    print(f"  Docs:   {result['output_markdown']}")
     print(f"  Symbols: {result['symbol_count']}")
     sys.exit(0)
 

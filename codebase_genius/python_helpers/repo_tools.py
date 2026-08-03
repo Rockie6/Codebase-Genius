@@ -1,6 +1,5 @@
-"""Repo tools: cloning, file tree building, README summarization.
-
-Utility functions for repository analysis and file discovery.
+"""Working with repositories: cloning them, mapping their files, and
+summarizing their READMEs. These are the plumbing behind the scenes.
 """
 from __future__ import annotations
 import os
@@ -28,8 +27,8 @@ TEXT_README_CANDIDATES = ["README.md", "README.rst", "README.txt"]
 
 
 def validate_repo_url(repo_url: str) -> Dict[str, Any]:
-    """Validate repository URL format and accessibility.
-    
+    """Check that a repository URL is something we can actually work with.
+
     Returns:
         dict with 'valid': bool, 'error': str (if invalid), 'normalized_url': str
     """
@@ -102,8 +101,8 @@ def clone_repo(
     retries: int = 2,
     backoff: float = 2.0,
 ) -> str:
-    """Clone repo with shallow depth and retry logic.
-    Returns path; raises RuntimeError on failure.
+    """Clone a repo (shallow, with a couple of retries).
+    Returns the local path; raises RuntimeError if it can't be done.
     """
     # Validate URL first
     validation = validate_repo_url(repo_url)
@@ -130,9 +129,9 @@ def clone_repo(
             last_err = e
             # Check for common errors
             if "Authentication failed" in str(e) or "could not read Username" in str(e):
-                raise RuntimeError(f"Private repository or authentication required: {repo_url}")
+                raise RuntimeError(f"This repo is private or needs authentication: {repo_url}")
             elif "Repository not found" in str(e) or "not found" in str(e).lower():
-                raise RuntimeError(f"Repository not found: {repo_url}")
+                raise RuntimeError(f"Couldn't find that repository: {repo_url}")
             
             if os.path.exists(dest):
                 shutil.rmtree(dest, ignore_errors=True)
@@ -198,6 +197,8 @@ def summarize_readme(text: str, max_len: int = 500) -> str:
 
 
 def repo_map_workflow(repo_url: str) -> Dict[str, Any]:
+    """Clone the repo and bundle up what we need: file tree, README summary,
+    and any likely entry-point files. Returns an error field on failure."""
     try:
         path = clone_repo(repo_url)
         file_tree = build_file_tree(path)
@@ -222,7 +223,7 @@ def repo_map_workflow(repo_url: str) -> Dict[str, Any]:
 
 
 def find_important_files(file_tree: Dict[str, Any]) -> List[str]:
-    """Identify high-priority files for analysis (main.py, app.py, etc.)."""
+    """Pick out the files most likely to be entry points (main.py, app.py, etc.)."""
     important = []
     priority_names = {
         "main.py",

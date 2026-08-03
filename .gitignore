@@ -23,6 +23,8 @@ wheels/
 # Virtual Environment
 ENV/
 env/
+venv/
+.venv/
 
 # Testing
 .pytest_cache/
@@ -44,9 +46,12 @@ htmlcov/
 .env.local
 .env.*.local
 
-# Virtual Environment
-venv/
-.venv/
+# API keys and secrets
+*api_key*
+*secret*
+*credentials*
+*.pem
+*.key
 
 # Logs
 *.log

@@ -1,5 +1,7 @@
-"""LLM integration stubs for README summarization.
-Uses Gemini if GEMINI_API_KEY and USE_LLM=1 are set; falls back otherwise.
+"""Optional LLM helpers, currently just README summarization.
+
+If you've set GEMINI_API_KEY and USE_LLM=1 we'll use Gemini to write a nice
+summary; otherwise we fall back to a simple truncation.
 """
 from __future__ import annotations
 import os
@@ -21,7 +23,7 @@ def _is_truthy(val: Optional[str]) -> bool:
 
 
 def summarize_readme_llm(text: str, max_len: int = 500) -> str:
-    """LLM summary (Gemini) or fallback to naive truncation."""
+    """Summarize a README with Gemini, or fall back to plain truncation."""
     if not text:
         return "No README content found."
     if not _is_truthy(os.getenv("USE_LLM")):
@@ -32,7 +34,8 @@ def summarize_readme_llm(text: str, max_len: int = 500) -> str:
     try:
         genai.configure(api_key=api_key)
         prompt = (
-            "Summarize the following project README into a concise overview (avoid marketing fluff).\n\n" + text[:6000]
+            "Write a short, friendly overview of this project based on its README. "
+            "Keep it plain and honest — skip the marketing fluff.\n\n" + text[:6000]
         )
         model = genai.GenerativeModel(DEFAULT_MODEL)
         resp = model.generate_content(prompt)

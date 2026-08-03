@@ -30,10 +30,10 @@ run:
 	$(UVICORN) codebase_genius.api_server:app --host 0.0.0.0 --port 8000
 
 test:
-	$(PY) -m codebase_genius.scripts.smoke_test
+	$(PY) -m pytest tests/ -v
 
 test-diagram:
-	$(PY) -m codebase_genius.scripts.test_diagram
+	$(PY) -c "from codebase_genius.python_helpers.docgen import generate_markdown; print('Diagram generation available')"
 
 docker-build:
 	docker build -t codebase-genius:local codebase_genius

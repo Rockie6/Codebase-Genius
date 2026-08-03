@@ -293,7 +293,7 @@
     <div class="header">
       <h1>🧠 Codebase Genius</h1>
       <p class="tagline">AI-Powered Documentation Generator</p>
-      <span class="badge">Powered by Python + Gemini LLM</span>
+      <span class="badge">Built with Python, optionally powered by Gemini</span>
     </div>
     
     <div class="panel">
@@ -316,7 +316,7 @@
         
         <div class="checkbox-group">
           <input type="checkbox" id="analyze" checked />
-          <label for="analyze">Enable deep code analysis (CCG + diagrams)</label>
+          <label for="analyze">Do the full deep analysis (charts + diagrams)</label>
         </div>
         
         <button type="submit" class="btn" id="submitBtn">
@@ -359,7 +359,7 @@
     </div>
     
     <div class="footer">
-      Made with ❤️ using Python • AI-powered analysis • LLM-enhanced summaries
+      Made with ❤️ in Python — AI-powered analysis, optional LLM summaries
     </div>
   </div>
 
@@ -512,7 +512,7 @@ form.addEventListener('submit', async (e) => {
     resultPanel.style.display = 'block';
     
     if (data.status === 'ok' || data.output_markdown || data.markdown_path) {
-      showStatus(`✅ Documentation generated successfully in ${elapsed}s`, 'success');
+      showStatus(`✅ All done — documentation ready in ${elapsed}s`, 'success');
       displayStats(data);
     } else if (data.error || data.error_code) {
       showStatus(`❌ ${data.message || data.error || 'Generation failed'}`, 'error');
